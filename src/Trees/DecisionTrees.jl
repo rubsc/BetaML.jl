@@ -402,7 +402,7 @@ function infoGain(leftY, rightY, parentUncertainty; splitting_criterion=gini)
     n_right = length(rightY)
     n_total = n_left + n_right
     p = n_left / n_total
-    left_score = Float64(splitting_criterion(leftY))s
+    left_score = Float64(splitting_criterion(leftY))
     right_score = Float64(splitting_criterion(rightY))
     println("Test which Package is used-- Fork")
     return parentUncertainty - p * left_score - (1 - p) * right_score
