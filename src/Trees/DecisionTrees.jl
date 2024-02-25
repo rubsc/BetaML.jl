@@ -128,6 +128,8 @@ Base.@kwdef mutable struct DecisionTreeE_hp <: BetaMLHyperParametersSet
     max_features::Union{Nothing,Int64}           = nothing
     "Whether to force a classification task even if the labels are numerical (typically when labels are integers encoding some feature rather than representing a real cardinal measure) [def: `false`]"
     force_classification::Bool                   = false
+    "This is the name of the function that defines the immpurity/gain to be used"
+    infoGain::Union{Nothing,Function} = nothing
     "This is the name of the function to be used to compute the information gain of a specific partition. This is done by measuring the difference betwwen the \"impurity\" of the labels of the parent node with those of the two child nodes, weighted by the respective number of items. [def: `nothing`, i.e. `gini` for categorical labels (classification task) and `variance` for numerical labels(regression task)]. Either `gini`, `entropy`, `variance` or a custom function. It can also be an anonymous function."
     splitting_criterion::Union{Nothing,Function} = nothing
     "Use an experimental faster algoritm for looking up the best split in ordered fields (colums). Currently it brings down the fitting time of an order of magnitude, but predictions are sensibly affected. If used, control the meaning of integer fields with `integer_encoded_cols`."
@@ -554,7 +556,7 @@ The given tree is then returned.
 
 Missing data (in the feature dataset) are supported.
 """
-function buildTree(x, y::AbstractArray{Ty,1}; max_depth = size(x,1), min_gain=0.0, min_records=2, max_features=size(x,2), force_classification=false, splitting_criterion = (Ty <: Number && !force_classification) ? variance : gini, integer_encoded_cols=nothing, fast_algorithm=false, mCols=nothing, rng = Random.GLOBAL_RNG, verbosity=NONE) where {Ty}
+function buildTree(x, y::AbstractArray{Ty,1}; max_depth = size(x,1), min_gain=0.0, min_records=2, max_features=size(x,2), force_classification=false, infoGain=infoGain, splitting_criterion = (Ty <: Number && !force_classification) ? variance : gini, integer_encoded_cols=nothing, fast_algorithm=false, mCols=nothing, rng = Random.GLOBAL_RNG, verbosity=NONE) where {Ty}
 
 
     #println(depth)
@@ -657,6 +659,7 @@ function fit!(m::DecisionTreeEstimator,x,y::AbstractArray{Ty,1}) where {Ty}
     end
 
     # Setting schortcuts to other hyperparameters/options....
+    infoGain             = m.hpar.infoGain
     min_gain             = m.hpar.min_gain
     min_records          = m.hpar.min_records
     force_classification = m.hpar.force_classification
@@ -666,7 +669,7 @@ function fit!(m::DecisionTreeEstimator,x,y::AbstractArray{Ty,1}) where {Ty}
     rng                 = m.opt.rng
     verbosity           = m.opt.verbosity
 
-    tree = buildTree(x, y; max_depth = max_depth, min_gain=min_gain, min_records=min_records, max_features=max_features, force_classification=force_classification, splitting_criterion = splitting_criterion, mCols=nothing, fast_algorithm=fast_algorithm, integer_encoded_cols=integer_encoded_cols, rng = rng)
+    tree = buildTree(x, y; max_depth = max_depth, min_gain=min_gain, min_records=min_records, max_features=max_features, force_classification=force_classification, infoGain=infoGain, splitting_criterion = splitting_criterion, mCols=nothing, fast_algorithm=fast_algorithm, integer_encoded_cols=integer_encoded_cols, rng = rng)
 
     m.par = DT_lp(tree,Tynm)
     if cache
