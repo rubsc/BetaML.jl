@@ -33,7 +33,7 @@ import Base.print
 import Base.show
 import Base.convert
 
-export DecisionTreeEstimator, DecisionTreeE_hp
+export DecisionTreeEstimator, DecisionTreeE_hp, infoGain
 # export AbstractDecisionNode,Leaf, DecisionNode, 
 # export buildTree
 #predictSingle # TODO: to remove
