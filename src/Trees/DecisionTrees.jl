@@ -408,7 +408,7 @@ function infoGain(leftY, rightY, parentUncertainty; splitting_criterion=gini)
 end
 
 
-function findbestgain_sortedvector(x, y, d, candidates; mCols, currentUncertainty, splitting_criterion, rng)
+function findbestgain_sortedvector(x, y, d, candidates; mCols, currentUncertainty, infoGain, splitting_criterion, rng)
     n = length(candidates)
     if n < 2
         return candidates[1]
@@ -425,12 +425,12 @@ function findbestgain_sortedvector(x, y, d, candidates; mCols, currentUncertaint
     utrueIdx = partition(uquestion, x, mCols, sorted=true, rng=rng)
     ugain = (any(utrueIdx) && !all(utrueIdx)) ? infoGain(y[utrueIdx], y[.!utrueIdx], currentUncertainty, splitting_criterion=splitting_criterion) : 0.0
 
-    return (lgain > ugain) ? findbestgain_sortedvector(x, y, d, candidates[1:u-1]; mCols=mCols, currentUncertainty=currentUncertainty, splitting_criterion=splitting_criterion, rng=rng) :
-                            findbestgain_sortedvector(x, y, d, candidates[l+1:end]; mCols=mCols, currentUncertainty=currentUncertainty, splitting_criterion=splitting_criterion, rng=rng)
+    return (lgain > ugain) ? findbestgain_sortedvector(x, y, d, candidates[1:u-1]; mCols=mCols, currentUncertainty=currentUncertainty, infoGain=infoGain, splitting_criterion=splitting_criterion, rng=rng) :
+                            findbestgain_sortedvector(x, y, d, candidates[l+1:end]; mCols=mCols, currentUncertainty=currentUncertainty,infoGain=infoGain, splitting_criterion=splitting_criterion, rng=rng)
 end
 
 """
-   findBestSplit(x,y;max_features,splitting_criterion)
+   findBestSplit(x,y;max_features,infoGain, splitting_criterion)
 
 Find the best possible split of the database.
 
@@ -444,7 +444,7 @@ Find the best question to ask by iterating over every feature / value and calcul
 - `rng`: Random Number Generator (see [`FIXEDSEED`](@ref)) [deafult: `Random.GLOBAL_RNG`]
 
 """
-function findBestSplit(x,y::AbstractArray{Ty,1}, mCols;max_features,splitting_criterion=gini, integer_encoded_cols, fast_algorithm, rng = Random.GLOBAL_RNG) where {Ty}
+function findBestSplit(x,y::AbstractArray{Ty,1}, mCols;max_features,infoGain, splitting_criterion=gini, integer_encoded_cols, fast_algorithm, rng = Random.GLOBAL_RNG) where {Ty}
     bestGain           = 0.0             # keep track of the best information gain
     bestQuestion       = Question(1,1.0) # keep track of the feature / value that produced it
     currentUncertainty = Float64(splitting_criterion(y))
@@ -461,7 +461,7 @@ function findBestSplit(x,y::AbstractArray{Ty,1}, mCols;max_features,splitting_cr
             sortedy = y[sortIdx]
 
             if fast_algorithm
-                bestvalue     = findbestgain_sortedvector(sortedx,sortedy,d,sortedx;mCols=mCols,currentUncertainty=currentUncertainty,splitting_criterion=splitting_criterion,rng=rng)
+                bestvalue     = findbestgain_sortedvector(sortedx,sortedy,d,sortedx;mCols=mCols,currentUncertainty=currentUncertainty,infoGain=infoGain, splitting_criterion=splitting_criterion,rng=rng)
                 bestQuestionD = Question(d,bestvalue)
                 btrueIdx      = partition(bestQuestionD,sortedx,mCols,sorted=true,rng=rng)
                 bestGainD     = 0.0             # keep track of the best information gain
@@ -586,7 +586,7 @@ function buildTree(x, y::AbstractArray{Ty,1}; max_depth = size(x,1), min_gain=0.
     # Try partitioing the dataset on each of the unique attribute,
     # calculate the information gain,
     # and return the question that produces the highest gain.
-    gain, question = findBestSplit(x,y,mCols;max_features=max_features,splitting_criterion=splitting_criterion,integer_encoded_cols=integer_encoded_cols,fast_algorithm=fast_algorithm,rng=rng)
+    gain, question = findBestSplit(x,y,mCols;max_features=max_features, infoGain=infoGain, splitting_criterion=splitting_criterion,integer_encoded_cols=integer_encoded_cols,fast_algorithm=fast_algorithm,rng=rng)
 
     # Base case: no further info gain
     # Since we can ask no further questions,
@@ -610,7 +610,7 @@ function buildTree(x, y::AbstractArray{Ty,1}; max_depth = size(x,1), min_gain=0.
             # Try partitioing the dataset on each of the unique attribute,
             # calculate the information gain,
             # and return the question that produces the highest gain.
-            gain, question = findBestSplit(thisNode.x,thisNode.y,mCols;max_features=max_features,splitting_criterion=splitting_criterion,integer_encoded_cols=integer_encoded_cols,fast_algorithm=fast_algorithm,rng=rng)
+            gain, question = findBestSplit(thisNode.x,thisNode.y,mCols;max_features=max_features, infoGain=infoGain, splitting_criterion=splitting_criterion,integer_encoded_cols=integer_encoded_cols,fast_algorithm=fast_algorithm,rng=rng)
             if gain <= min_gain
                 isLeaf = true
             end
