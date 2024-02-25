@@ -404,13 +404,9 @@ function infoGain(leftY, rightY, parentUncertainty; splitting_criterion=gini)
     p = n_left / n_total
     left_score = Float64(splitting_criterion(leftY))
     right_score = Float64(splitting_criterion(rightY))
-    println("Test which Package is used-- Fork")
     return parentUncertainty - p * left_score - (1 - p) * right_score
 end
-function infoGainOld(leftY, rightY, parentUncertainty; splitting_criterion=gini)
-    p = size(leftY,1) / (size(leftY,1) + size(rightY,1))
-    return parentUncertainty - p * splitting_criterion(leftY) - (1 - p) * splitting_criterion(rightY)
-end
+
 
 function findbestgain_sortedvector(x, y, d, candidates; mCols, currentUncertainty, splitting_criterion, rng)
     n = length(candidates)
@@ -431,41 +427,6 @@ function findbestgain_sortedvector(x, y, d, candidates; mCols, currentUncertaint
 
     return (lgain > ugain) ? findbestgain_sortedvector(x, y, d, candidates[1:u-1]; mCols=mCols, currentUncertainty=currentUncertainty, splitting_criterion=splitting_criterion, rng=rng) :
                             findbestgain_sortedvector(x, y, d, candidates[l+1:end]; mCols=mCols, currentUncertainty=currentUncertainty, splitting_criterion=splitting_criterion, rng=rng)
-end
-function findbestgain_sortedvectorOLD(x,y,d,candidates;mCols,currentUncertainty,splitting_criterion,rng)
-    #println(splitting_criterion)
-    #println("HERE I AM CALLED ! Dimension $d, candidates: ", candidates)
-    n = size(candidates,1)
-    #println("n is: ",n)
-    #println("candidates is: ", candidates)
-    if n < 2
-        return candidates[1]
-    end
-    l = max(1,Int(round((1/4) * n ))) # lower bound candidate
-    u = min(n,Int(round((3/4) * n ))) # upper bound candidate
-
-    
-    #println("l is: ",l)
-    #println("u is: ",u)
-    lquestion = Question(d, candidates[l])
-    ltrueIdx  = partition(lquestion,x,mCols,sorted=true,rng=rng)
-    lgain = 0.0
-    if !all(ltrueIdx) && any(ltrueIdx)
-       lgain = infoGain(y[ltrueIdx], y[map(!,ltrueIdx)], currentUncertainty, splitting_criterion=splitting_criterion)
-    end
-
-    uquestion = Question(d, candidates[u])
-    utrueIdx  = partition(uquestion,x,mCols,sorted=true,rng=rng)
-    ugain = 0.0
-    if !all(utrueIdx) && any(utrueIdx)
-       ugain = infoGain(y[utrueIdx], y[map(!,utrueIdx)], currentUncertainty, splitting_criterion=splitting_criterion)
-    end    
-
-    if lgain > ugain
-        return findbestgain_sortedvector(x,y,d,candidates[1:u-1];mCols=mCols,currentUncertainty=currentUncertainty,splitting_criterion=splitting_criterion,rng=rng)
-    else
-        return findbestgain_sortedvector(x,y,d,candidates[l+1:n];mCols=mCols,currentUncertainty=currentUncertainty,splitting_criterion=splitting_criterion,rng=rng)
-    end
 end
 
 """
