@@ -525,90 +525,6 @@ function findBestSplit(x,y::AbstractArray{Ty,1}, mCols;max_features,splitting_cr
     end
     return bestGain, bestQuestion
 end
-function findBestSplitOLD(x,y::AbstractArray{Ty,1}, mCols;max_features,splitting_criterion=gini, integer_encoded_cols, fast_algorithm, rng = Random.GLOBAL_RNG) where {Ty}
-    bestGain           = 0.0             # keep track of the best information gain
-    bestQuestion       = Question(1,1.0) # keep track of the feature / value that produced it
-    currentUncertainty = splitting_criterion(y)
-    (N,D)              = size(x)  # number of columns (the last column is the label)
-
-    featuresToConsider = (max_features >= D) ? (1:D) : StatsBase.sample(rng, 1:D, max_features, replace=false)
-
-    for d in featuresToConsider      # for each feature (we consider only max_features features randomly)
-        values = Set(skipmissing(x[:,d]))  # unique values in the column
-        sortable = Utils.issortable(x[:,d])
-        if(sortable && !in(d,integer_encoded_cols))
-            sortIdx = sortperm(x[:,d])
-            sortedx = x[sortIdx,:]
-            sortedy = y[sortIdx]
-
-            if fast_algorithm
-                bestvalue     = findbestgain_sortedvector(sortedx,sortedy,d,sortedx;mCols=mCols,currentUncertainty=currentUncertainty,splitting_criterion=splitting_criterion,rng=rng)
-                bestQuestionD = Question(d,bestvalue)
-                btrueIdx      = partition(bestQuestionD,sortedx,mCols,sorted=true,rng=rng)
-                bestGainD     = 0.0             # keep track of the best information gain
-                if !all(btrueIdx) && any(btrueIdx)
-                    bestGainD  = infoGain(sortedy[btrueIdx], sortedy[map(!,btrueIdx)], currentUncertainty, splitting_criterion=splitting_criterion)
-                end
-                if bestGainD >= bestGain
-                    bestGain, bestQuestion = bestGainD, bestQuestionD
-                end
-            else
-                for val in values  # for each value- it is this one that I can optimize (when it is sortable)!
-                    question = Question(d, val)
-                    # try splitting the dataset
-                    #println(question)
-                    trueIdx = partition(question,sortedx,mCols,sorted=true,rng=rng)
-                    # Skip this split if it doesn't divide the
-                    # dataset.
-                    if all(trueIdx) || ! any(trueIdx)
-                        continue
-                    end
-                    # Calculate the information gain from this split
-                    gain = infoGain(sortedy[trueIdx], sortedy[map(!,trueIdx)], currentUncertainty, splitting_criterion=splitting_criterion)
-                    # You actually can use '>' instead of '>=' here
-                    # but I wanted the tree to look a certain way for our
-                    # toy dataset.
-                    if gain >= bestGain
-                    #    println("*** New best gain: ", question)
-                        bestGain, bestQuestion = gain, question
-                    #else
-                    #    println("    bad gain: ", question)
-                    end
-                end
-            end
-
-        else
-            sortIdx = 1:N
-            sortedx = x
-            sortedy = y
-
-            for val in values  # for each value - not optimisable
-                question = Question(d, val)
-                # try splitting the dataset
-                #println(question)
-                trueIdx = partition(question,sortedx,mCols,sorted=false,rng=rng)
-                # Skip this split if it doesn't divide the
-                # dataset.
-                if all(trueIdx) || ! any(trueIdx)
-                    continue
-                end
-                # Calculate the information gain from this split
-                gain = infoGain(sortedy[trueIdx], sortedy[map(!,trueIdx)], currentUncertainty, splitting_criterion=splitting_criterion)
-                # You actually can use '>' instead of '>=' here
-                # but I wanted the tree to look a certain way for our
-                # toy dataset.
-                if gain >= bestGain
-                    bestGain, bestQuestion = gain, question
-                end
-            end
-
-        end
-
-
-    end
-    return bestGain, bestQuestion
-end
-
 
 """
 
@@ -935,4 +851,55 @@ function show(io::IO, m::DecisionTreeEstimator)
         println(io,m.info)
         _printNode(m.par.tree)
     end
+end
+
+
+# New Idea for splitting criterion in tree classifer from BetaML
+
+function own_splitting(leftY)
+    n = length(leftY)
+    leftY_sort = sort(leftY,rev=true)
+
+    #work with accelaration (might run into issues, continuous variable might be better)
+    test = cumsum(leftY_sort)./ (1:n)
+    target = 0.10
+    accel = findlast(x->isless(x,target),test)
+    if accel==nothing
+        accel=0
+    end
+    return(accel)
+end
+
+"""
+    ownGain_custom_split(leftY, rightY, parentScore; splitting_criterion=own_splitting)
+
+Compute the improvement of a specific partition.
+
+Compare the "score improvement" my measuring the difference between the worst case accelaration of the slippage scores
+of the parent node with those of the two child nodes under the assumption that first all left nodes are used.
+If all elements in leftY are accepted, then rightY elements are considered with an adjusted target to account for
+accrued slippage in leftY.
+
+# Parameters:
+- `leftY`:  Child #1 labels (slippage scores)
+- `rightY`: Child #2 labels (slippage scores)
+- `parentScore`: worst case accelaration of all labels in the parent node
+- `splitting_criterion`: Metric to adopt to determine the score per node
+        own_splitting needs labels (slippages) and the target slippage to calculate accelaration
+
+
+"""
+function ownGain(leftY, rightY, parentScore; splitting_criterion=own_splitting)
+    n_left = length(leftY)
+    
+    left_score = Float64(own_splitting(leftY))
+    if left_score == n_left
+        leftY_sort = sort(leftY,rev=true)
+        test = cumsum(leftY_sort)./ (1:n_left)
+        right_score = Float64(own_splitting(rightY)) #,target-test[end]
+        return left_score + right_score - parentScore 
+    else
+        return left_score - parentScore #adjust likewise
+    end
+
 end
