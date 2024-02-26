@@ -145,6 +145,7 @@ Base.@kwdef mutable struct DecisionTreeE_hp <: BetaMLHyperParametersSet
     """
     Target slippage for custom splitting function
     """
+    target_slip::Float64                        =0.13
 end
 
 
