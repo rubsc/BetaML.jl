@@ -65,6 +65,8 @@ mutable struct DecisionTreeRegressor <: MMI.Deterministic
     max_features::Int64
     "This is the name of the function to be used to compute the information gain of a specific partition. This is done by measuring the difference betwwen the \"impurity\" of the labels of the parent node with those of the two child nodes, weighted by the respective number of items. [def: `variance`]. Either `variance` or a custom function. It can also be an anonymous function."
     splitting_criterion::Function
+    "Custom gain function"
+    infoGain::Function
     "A Random Number Generator to be used in stochastic parts of the code [deafult: `Random.GLOBAL_RNG`]"
     rng::AbstractRNG
 end
@@ -73,9 +75,10 @@ DecisionTreeRegressor(;
    min_gain=0.0,
    min_records=2,
    max_features=0,
+   infoGain = infoGain,
    splitting_criterion=BetaML.Utils.variance,
    rng = Random.GLOBAL_RNG,
-   ) = DecisionTreeRegressor(max_depth,min_gain,min_records,max_features,splitting_criterion,rng)
+   ) = DecisionTreeRegressor(max_depth,min_gain,min_records,max_features,infoGain, splitting_criterion,rng)
 
 """
 $(TYPEDEF)
