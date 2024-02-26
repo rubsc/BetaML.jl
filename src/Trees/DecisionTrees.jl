@@ -767,7 +767,7 @@ function predict(m::DecisionTreeEstimator,x)
             x = permutedims(x)
         end
     else
-        x = permutedims([x])
+        #x = permutedims([x])
     end 
     rawout = predictSingle.(Ref(m.par.tree),eachrow(x),rng=m.opt.rng)
     if (Ty <: Integer && m.hpar.force_classification)
