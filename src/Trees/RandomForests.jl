@@ -49,6 +49,8 @@ Base.@kwdef mutable struct RandomForestE_hp <: BetaMLHyperParametersSet
     max_features::Union{Nothing,Int64}           = nothing
     "Whether to force a classification task even if the labels are numerical (typically when labels are integers encoding some feature rather than representing a real cardinal measure) [def: `false`]"
     force_classification::Bool                   = false
+    "This is the name of the function that defines the immpurity/gain to be used"
+    infoGain::Union{Nothing,Function} = nothing
     "Either `gini`, `entropy` or `variance`. This is the name of the function to be used to compute the information gain of a specific partition. This is done by measuring the difference betwwen the \"impurity\" of the labels of the parent node with those of the two child nodes, weighted by the respective number of items. [def: `nothing`, i.e. `gini` for categorical labels (classification task) and `variance` for numerical labels(regression task)]. It can be an anonymous function."
     splitting_criterion::Union{Nothing,Function} = nothing
     "Use an experimental faster algoritm for looking up the best split in ordered fields (colums). Currently it brings down the fitting time of an order of magnitude, but predictions are sensibly affected. If used, control the meaning of integer fields with `integer_encoded_cols`."
@@ -65,6 +67,10 @@ Base.@kwdef mutable struct RandomForestE_hp <: BetaMLHyperParametersSet
     To implement automatic hyperparameter tuning during the (first) `fit!` call simply set `autotune=true` and eventually change the default `tunemethod` options (including the parameter ranges, the resources to employ and the loss function to adopt).
     """
     tunemethod::AutoTuneMethod                  = SuccessiveHalvingSearch(hpranges=Dict("n_trees" => [10, 20, 30, 40], "max_depth" =>[5,10,nothing], "min_gain"=>[0.0, 0.1, 0.5], "min_records"=>[2,3,5],"max_features"=>[nothing,5,10,30],"beta"=>[0,0.01,0.1]),multithreads=false) # RF are already MT
+    """
+    Set target for custom splitting function
+    """
+      target_slip::Float64                      = 0.13
 end
 
 Base.@kwdef mutable struct RF_lp <: BetaMLLearnableParametersSet
@@ -199,7 +205,7 @@ See [`buildTree`](@ref). The function has all the parameters of `bildTree` (with
 - This function optionally reports a weight distribution of the performances of eanch individual trees, as measured using the records he has not being trained with. These weights can then be (optionally) used in the `predict` function. The parameter `β ≥ 0` regulate the distribution of these weights: larger is `β`, the greater the importance (hence the weights) attached to the best-performing trees compared to the low-performing ones. Using these weights can significantly improve the forest performances (especially using small forests), however the correct value of β depends on the problem under exam (and the chosen caratteristics of the random forest estimator) and should be cross-validated to avoid over-fitting.
 - Note that this function uses multiple threads if these are available. You can check the number of threads available with `Threads.nthreads()`. To set the number of threads in Julia either set the environmental variable `JULIA_NUM_THREADS` (before starting Julia) or start Julia with the command line option `--threads` (most integrated development editors for Julia already set the number of threads to 4).
 """
-function buildForest(x, y::AbstractArray{Ty,1}, n_trees=30; max_depth = size(x,1), min_gain=0.0, min_records=2, max_features=Int(round(sqrt(size(x,2)))), force_classification=false, splitting_criterion = (Ty <: Number && !force_classification) ? variance : gini, integer_encoded_cols=nothing, fast_algorithm=false, β=0, oob=false,rng = Random.GLOBAL_RNG, verbosity=NONE) where {Ty}
+function buildForest(x, y::AbstractArray{Ty,1}, n_trees=30; max_depth = size(x,1), min_gain=0.0, min_records=2, max_features=Int(round(sqrt(size(x,2)))), force_classification=false,infoGain=infoGain, splitting_criterion = (Ty <: Number && !force_classification) ? variance : gini, integer_encoded_cols=nothing, fast_algorithm=false, β=0, oob=false,rng = Random.GLOBAL_RNG, verbosity=NONE) where {Ty}
     # Force what would be a regression task into a classification task
     if force_classification && Ty <: Number
         y = string.(y)
@@ -234,7 +240,7 @@ function buildForest(x, y::AbstractArray{Ty,1}, n_trees=30; max_depth = size(x,1
         bootstrappedy = y[toSample]
         #controlx = x[notToSample,:]
         #controly = y[notToSample]
-        tree = buildTree(bootstrappedx, bootstrappedy; max_depth = max_depth, min_gain=min_gain, min_records=min_records, max_features=max_features, splitting_criterion = splitting_criterion, force_classification=force_classification, integer_encoded_cols=integer_encoded_cols, fast_algorithm=fast_algorithm, rng = tsrng, verbosity=verbosity)
+        tree = buildTree(bootstrappedx, bootstrappedy; max_depth = max_depth, min_gain=min_gain, min_records=min_records, max_features=max_features,infoGain = infoGain, splitting_criterion = splitting_criterion, force_classification=force_classification, integer_encoded_cols=integer_encoded_cols, fast_algorithm=fast_algorithm, rng = tsrng, verbosity=verbosity)
         #ŷ = predict(tree,controlx)
         trees[i] = tree
         notSampledByTree[i] = notToSample
@@ -278,6 +284,7 @@ function fit!(m::RandomForestEstimator,x,y::AbstractArray{Ty,1}) where {Ty}
     end
 
     # Setting schortcuts to other hyperparameters/options....
+    infoGain             = m.hpar.infoGain
     min_gain             = m.hpar.min_gain
     min_records          = m.hpar.min_records
     force_classification = m.hpar.force_classification
