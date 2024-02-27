@@ -133,6 +133,8 @@ mutable struct DecisionTreeClassifier <: MMI.Probabilistic
    max_features::Int64
    "This is the name of the function to be used to compute the information gain of a specific partition. This is done by measuring the difference betwwen the \"impurity\" of the labels of the parent node with those of the two child nodes, weighted by the respective number of items. [def: `gini`]. Either `gini`, `entropy` or a custom function. It can also be an anonymous function."
    splitting_criterion::Function
+   "Custom gain function"
+    infoGain::Function
    "A Random Number Generator to be used in stochastic parts of the code [deafult: `Random.GLOBAL_RNG`]"
    rng::AbstractRNG
 end
@@ -141,9 +143,10 @@ DecisionTreeClassifier(;
   min_gain=0.0,
   min_records=2,
   max_features=0,
+  infoGain = infoGain, 
   splitting_criterion=BetaML.Utils.gini,
   rng = Random.GLOBAL_RNG,
-  ) = DecisionTreeClassifier(max_depth,min_gain,min_records,max_features,splitting_criterion,rng)
+  ) = DecisionTreeClassifier(max_depth,min_gain,min_records,max_features,infoGain,splitting_criterion,rng)
 
 """
 $(TYPEDEF)
@@ -203,6 +206,8 @@ mutable struct RandomForestRegressor <: MMI.Deterministic
    min_records::Int64
    "The maximum number of (random) features to consider at each partitioning [def: `0`, i.e. square root of the data dimension]"
    max_features::Int64
+   "Custom gain function"
+   infoGain::Function
    "This is the name of the function to be used to compute the information gain of a specific partition. This is done by measuring the difference betwwen the \"impurity\" of the labels of the parent node with those of the two child nodes, weighted by the respective number of items. [def: `variance`]. Either `variance` or a custom function. It can also be an anonymous function."
    splitting_criterion::Function
    "Parameter that regulate the weights of the scoring of each tree, to be (optionally) used in prediction based on the error of the individual trees computed on the records on which trees have not been trained. Higher values favour \"better\" trees, but too high values will cause overfitting [def: `0`, i.e. uniform weigths]"
@@ -216,10 +221,11 @@ RandomForestRegressor(;
   min_gain=0.0,
   min_records=2,
   max_features=0,
+  infoGain = infoGain,
   splitting_criterion=BetaML.Utils.variance,
   β=0.0,
   rng = Random.GLOBAL_RNG,
-  ) = RandomForestRegressor(n_trees,max_depth,min_gain,min_records,max_features,splitting_criterion,β,rng)
+  ) = RandomForestRegressor(n_trees,max_depth,min_gain,min_records,max_features,infoGain,splitting_criterion,β,rng)
 
 """
 $(TYPEDEF)
@@ -273,6 +279,8 @@ mutable struct RandomForestClassifier <: MMI.Probabilistic
     min_records::Int64
     "The maximum number of (random) features to consider at each partitioning [def: `0`, i.e. square root of the data dimensions]"
     max_features::Int64
+    "Gain function to be used together with splitting_criterion."
+    infoGain::Function
     "This is the name of the function to be used to compute the information gain of a specific partition. This is done by measuring the difference betwwen the \"impurity\" of the labels of the parent node with those of the two child nodes, weighted by the respective number of items. [def: `gini`]. Either `gini`, `entropy` or a custom function. It can also be an anonymous function."
     splitting_criterion::Function
     "Parameter that regulate the weights of the scoring of each tree, to be (optionally) used in prediction based on the error of the individual trees computed on the records on which trees have not been trained. Higher values favour \"better\" trees, but too high values will cause overfitting [def: `0`, i.e. uniform weigths]"
@@ -286,10 +294,11 @@ RandomForestClassifier(;
     min_gain=0.0,
     min_records=2,
     max_features=0,
+    infoGain = infoGain, 
     splitting_criterion=BetaML.Utils.gini,
     β=0.0,
     rng = Random.GLOBAL_RNG,
-) = RandomForestClassifier(n_trees,max_depth,min_gain,min_records,max_features,splitting_criterion,β,rng)
+) = RandomForestClassifier(n_trees,max_depth,min_gain,min_records,max_features,infoGain, splitting_criterion,β,rng)
 
 #=
 # skipped for now..
@@ -322,7 +331,7 @@ function MMI.fit(model::Union{DecisionTreeRegressor,RandomForestRegressor}, verb
        fitresult   = BetaML.Trees.buildTree(x, y, max_depth=max_depth, min_gain=model.min_gain, min_records=model.min_records, max_features=max_features, splitting_criterion=model.splitting_criterion,rng=model.rng, verbosity=verbosity)
    else
        max_features = model.max_features == 0 ? Int(round(sqrt(size(x,2)))) : model.max_features
-       fitresult   = BetaML.Trees.buildForest(x, y, model.n_trees, max_depth=max_depth, min_gain=model.min_gain, min_records=model.min_records, max_features=max_features, splitting_criterion=model.splitting_criterion, β=model.β,rng=model.rng,verbosity=verbosity)
+       fitresult   = BetaML.Trees.buildForest(x, y, model.n_trees, max_depth=max_depth, min_gain=model.min_gain, min_records=model.min_records, max_features=max_features, infoGain=infoGain, splitting_criterion=model.splitting_criterion, β=model.β,rng=model.rng,verbosity=verbosity)
    end
    cache=nothing
    report=nothing
