@@ -67,10 +67,6 @@ Base.@kwdef mutable struct RandomForestE_hp <: BetaMLHyperParametersSet
     To implement automatic hyperparameter tuning during the (first) `fit!` call simply set `autotune=true` and eventually change the default `tunemethod` options (including the parameter ranges, the resources to employ and the loss function to adopt).
     """
     tunemethod::AutoTuneMethod                  = SuccessiveHalvingSearch(hpranges=Dict("n_trees" => [10, 20, 30, 40], "max_depth" =>[5,10,nothing], "min_gain"=>[0.0, 0.1, 0.5], "min_records"=>[2,3,5],"max_features"=>[nothing,5,10,30],"beta"=>[0,0.01,0.1]),multithreads=false) # RF are already MT
-    """
-    Set target for custom splitting function
-    """
-      target_slip::Float64                      = 0.13
 end
 
 Base.@kwdef mutable struct RF_lp <: BetaMLLearnableParametersSet
